@@ -1,0 +1,10 @@
+const express = require('express');
+const r = express.Router();
+const { inventoryController: ctrl } = require('../controllers/all.controllers');
+const { authenticate, requireRole } = require('../middlewares/auth.middleware');
+r.get('/ingredients', authenticate, ctrl.getIngredients);
+r.post('/ingredients', authenticate, requireRole('Quản lý'), ctrl.createIngredient);
+r.put('/ingredients/:id', authenticate, requireRole('Quản lý'), ctrl.updateIngredient);
+r.get('/vouchers', authenticate, ctrl.getVouchers);
+r.post('/vouchers', authenticate, requireRole('Quản lý'), ctrl.createWarehouseVoucher);
+module.exports = r;

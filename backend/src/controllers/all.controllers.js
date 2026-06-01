@@ -1,0 +1,386 @@
+// ═══════════════════════════════════════════════════
+// KDS CONTROLLER
+// ═══════════════════════════════════════════════════
+const prisma = require('../prisma/client');
+const { asyncHandler } = require('../middlewares/error.middleware');
+const { emitOrderStatusUpdate, emitOrderComplete } = require('../socket/socketManager');
+
+// GET /api/kds/orders — live orders for kitchen display
+const getKDSOrders = asyncHandler(async (req, res) => {
+  const orders = await prisma.donHang.findMany({
+    where: { trangThai: { in: ['CHO_XAC_NHAN', 'DANG_PHA_CHE'] } },
+    include: {
+      chiTiet: { include: { mon: true, tuyChon: true } },
+      ban: true
+    },
+    orderBy: { thoiGianTao: 'asc' }
+  });
+  res.json(orders);
+});
+
+// PATCH /api/kds/orders/:id/accept
+const acceptOrder = asyncHandler(async (req, res) => {
+  const order = await prisma.donHang.update({
+    where: { maDonHang: req.params.id },
+    data: { trangThai: 'DANG_PHA_CHE' },
+    include: { chiTiet: { include: { mon: true } }, ban: true }
+  });
+  emitOrderStatusUpdate(order);
+  res.json(order);
+});
+
+// PATCH /api/kds/orders/:id/complete
+const completeOrder = asyncHandler(async (req, res) => {
+  const order = await prisma.donHang.update({
+    where: { maDonHang: req.params.id },
+    data: { trangThai: 'HOAN_THANH' },
+    include: { chiTiet: { include: { mon: true } }, ban: true }
+  });
+  if (order.maBan) {
+    await prisma.ban.update({ where: { maBan: order.maBan }, data: { trangThai: 'CHO_DON' } });
+  }
+  emitOrderComplete(order);
+  res.json(order);
+});
+
+const kdsController = { getKDSOrders, acceptOrder, completeOrder };
+
+// ═══════════════════════════════════════════════════
+// TABLE CONTROLLER
+// ═══════════════════════════════════════════════════
+const { emitTableUpdate } = require('../socket/socketManager');
+
+const getTables = asyncHandler(async (req, res) => {
+  const tables = await prisma.ban.findMany({ orderBy: { soBan: 'asc' } });
+  res.json(tables);
+});
+
+const createTable = asyncHandler(async (req, res) => {
+  const { soBan } = req.body;
+  const table = await prisma.ban.create({ data: { soBan, trangThai: 'TRONG' } });
+  emitTableUpdate(table);
+  res.status(201).json(table);
+});
+
+const updateTable = asyncHandler(async (req, res) => {
+  const { soBan, trangThai } = req.body;
+  const table = await prisma.ban.update({
+    where: { maBan: req.params.id }, data: { soBan, trangThai }
+  });
+  emitTableUpdate(table);
+  res.json(table);
+});
+
+const deleteTable = asyncHandler(async (req, res) => {
+  await prisma.ban.delete({ where: { maBan: req.params.id } });
+  res.json({ message: 'Đã xóa bàn' });
+});
+
+const tableController = { getTables, createTable, updateTable, deleteTable };
+
+// ═══════════════════════════════════════════════════
+// INVENTORY CONTROLLER
+// ═══════════════════════════════════════════════════
+const { emitLowStock } = require('../socket/socketManager');
+
+const LOW_STOCK_THRESHOLD = 10;
+
+const getIngredients = asyncHandler(async (req, res) => {
+  const items = await prisma.nguyenLieu.findMany({ where: { daXoa: false }, orderBy: { tenNL: 'asc' } });
+  res.json(items);
+});
+
+const createIngredient = asyncHandler(async (req, res) => {
+  const { tenNL, tonKho, donVi } = req.body;
+  const item = await prisma.nguyenLieu.create({ data: { tenNL, tonKho, donVi } });
+  res.status(201).json(item);
+});
+
+const updateIngredient = asyncHandler(async (req, res) => {
+  const item = await prisma.nguyenLieu.update({
+    where: { maNguyenLieu: req.params.id }, data: req.body
+  });
+  if (item.tonKho <= LOW_STOCK_THRESHOLD) emitLowStock(item);
+  res.json(item);
+});
+
+const createWarehouseVoucher = asyncHandler(async (req, res) => {
+  const { loaiPhieu, maNCC, items } = req.body; // NHAP | XUAT | HUY
+  const maNhanVien = req.user.maNguoiDung;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const tongGiaTri = items.reduce((s, i) => s + i.soLuongThucTe * i.donGia, 0);
+    const phieu = await tx.phieuKho.create({
+      data: {
+        thoiGianLap: new Date(), tongGiaTri, loaiPhieu, maNCC, maNhanVien,
+        chiTiet: { create: items }
+      },
+      include: { chiTiet: true }
+    });
+
+    // Update stock
+    for (const item of items) {
+      const delta = loaiPhieu === 'NHAP' ? item.soLuongThucTe : -item.soLuongThucTe;
+      const nl = await tx.nguyenLieu.update({
+        where: { maNguyenLieu: item.maNguyenLieu },
+        data: { tonKho: { increment: delta } }
+      });
+      if (nl.tonKho <= LOW_STOCK_THRESHOLD) emitLowStock(nl);
+    }
+    return phieu;
+  });
+
+  res.status(201).json(result);
+});
+
+const getVouchers = asyncHandler(async (req, res) => {
+  const vouchers = await prisma.phieuKho.findMany({
+    include: { chiTiet: { include: { nguyenLieu: true } }, nhanVien: { include: { nguoiDung: true } } },
+    orderBy: { thoiGianLap: 'desc' }
+  });
+  res.json(vouchers);
+});
+
+const inventoryController = { getIngredients, createIngredient, updateIngredient, createWarehouseVoucher, getVouchers };
+
+// ═══════════════════════════════════════════════════
+// STAFF CONTROLLER
+// ═══════════════════════════════════════════════════
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
+
+const getStaff = asyncHandler(async (req, res) => {
+  const staff = await prisma.nhanVien.findMany({
+    include: {
+      nguoiDung: { select: { hoTen: true, email: true, soDienThoai: true, avatarUrl: true, isDeleted: true } },
+      vaiTro: true
+    }
+  });
+  res.json(staff);
+});
+
+const createStaff = asyncHandler(async (req, res) => {
+  const { hoTen, email, soDienThoai, matKhau, maVaiTro } = req.body;
+  const hash = await bcrypt.hash(matKhau, 10);
+  const id = `NV_${uuidv4().substring(0, 8).toUpperCase()}`;
+  const staff = await prisma.nguoiDung.create({
+    data: {
+      maNguoiDung: id, hoTen, email, soDienThoai, matKhau: hash,
+      nhanVien: { create: { maNhanVien: id, hireDate: new Date(), maVaiTro } }
+    },
+    include: { nhanVien: { include: { vaiTro: true } } }
+  });
+  const { matKhau: _, ...safe } = staff;
+  res.status(201).json(safe);
+});
+
+const getShifts = asyncHandler(async (req, res) => {
+  const { maNhanVien, date } = req.query;
+  const where = {};
+  if (maNhanVien) where.maNhanVien = maNhanVien;
+  if (date) {
+    const d = new Date(date);
+    where.thoiGianVaoCa = { gte: new Date(d.setHours(0,0,0,0)), lte: new Date(d.setHours(23,59,59,999)) };
+  }
+  const shifts = await prisma.caLamViec.findMany({
+    where, include: { nhanVien: { include: { nguoiDung: { select: { hoTen: true } } } } },
+    orderBy: { thoiGianVaoCa: 'desc' }
+  });
+  res.json(shifts);
+});
+
+const checkin = asyncHandler(async (req, res) => {
+  const shift = await prisma.caLamViec.create({
+    data: { loaiCa: req.body.loaiCa || 'SANG', thoiGianVaoCa: new Date(), maNhanVien: req.user.maNguoiDung }
+  });
+  res.status(201).json(shift);
+});
+
+const checkout = asyncHandler(async (req, res) => {
+  const shift = await prisma.caLamViec.update({
+    where: { maCa: req.params.id }, data: { thoiGianRaCa: new Date() }
+  });
+  res.json(shift);
+});
+
+const staffController = { getStaff, createStaff, getShifts, checkin, checkout };
+
+// ═══════════════════════════════════════════════════
+// REPORT CONTROLLER
+// ═══════════════════════════════════════════════════
+const getRevenueReport = asyncHandler(async (req, res) => {
+  const { type = 'today', from, to } = req.query;
+  let start, end;
+  const now = new Date();
+
+  if (type === 'today') {
+    start = new Date(now.setHours(0,0,0,0)); end = new Date(now.setHours(23,59,59,999));
+  } else if (type === 'month') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59);
+  } else {
+    start = new Date(from); end = new Date(to);
+  }
+
+  const [totalOrders, completedOrders, cancelledOrders, revenue, topItems] = await Promise.all([
+    prisma.donHang.count({ where: { thoiGianTao: { gte: start, lte: end } } }),
+    prisma.donHang.count({ where: { trangThai: 'HOAN_THANH', thoiGianTao: { gte: start, lte: end } } }),
+    prisma.donHang.count({ where: { trangThai: 'HUY', thoiGianTao: { gte: start, lte: end } } }),
+    prisma.donHang.aggregate({
+      where: { trangThai: 'HOAN_THANH', thoiGianTao: { gte: start, lte: end } },
+      _sum: { tongThanhToan: true }
+    }),
+    prisma.chiTietDonHang.groupBy({
+      by: ['maMon'],
+      where: { donHang: { trangThai: 'HOAN_THANH', thoiGianTao: { gte: start, lte: end } } },
+      _sum: { soLuong: true },
+      orderBy: { _sum: { soLuong: 'desc' } },
+      take: 10
+    })
+  ]);
+
+  // Get top item names
+  const topItemsWithName = await Promise.all(topItems.map(async (t) => {
+    const mon = await prisma.mon.findUnique({ where: { maMon: t.maMon }, select: { tenMon: true } });
+    return { ...t, tenMon: mon?.tenMon };
+  }));
+
+  res.json({
+    totalOrders, completedOrders, cancelledOrders,
+    revenue: revenue._sum.tongThanhToan || 0,
+    topItems: topItemsWithName,
+    period: { start, end }
+  });
+});
+
+const getDailyRevenue = asyncHandler(async (req, res) => {
+  const { days = 30 } = req.query;
+  const start = new Date(); start.setDate(start.getDate() - days);
+
+  const orders = await prisma.donHang.findMany({
+    where: { trangThai: 'HOAN_THANH', thoiGianTao: { gte: start } },
+    select: { thoiGianTao: true, tongThanhToan: true }
+  });
+
+  const grouped = {};
+  for (const o of orders) {
+    const day = o.thoiGianTao.toISOString().split('T')[0];
+    grouped[day] = (grouped[day] || 0) + Number(o.tongThanhToan);
+  }
+
+  res.json(Object.entries(grouped).map(([date, revenue]) => ({ date, revenue })).sort((a,b) => a.date.localeCompare(b.date)));
+});
+
+const reportController = { getRevenueReport, getDailyRevenue };
+
+// ═══════════════════════════════════════════════════
+// PROMO CONTROLLER
+// ═══════════════════════════════════════════════════
+const getPromos = asyncHandler(async (req, res) => {
+  const promos = await prisma.khuyenMai.findMany({ orderBy: { ngayBatDau: 'desc' } });
+  res.json(promos);
+});
+
+const createPromo = asyncHandler(async (req, res) => {
+  const promo = await prisma.khuyenMai.create({ data: req.body });
+  res.status(201).json(promo);
+});
+
+const updatePromo = asyncHandler(async (req, res) => {
+  const promo = await prisma.khuyenMai.update({ where: { maKM: req.params.id }, data: req.body });
+  res.json(promo);
+});
+
+const validatePromo = asyncHandler(async (req, res) => {
+  const { maKM, tongTien } = req.body;
+  const km = await prisma.khuyenMai.findUnique({ where: { maKM } });
+  if (!km || !km.trangThai) return res.status(400).json({ valid: false, message: 'Mã không hợp lệ' });
+  if (new Date() < km.ngayBatDau || new Date() > km.ngayKetThuc) {
+    return res.status(400).json({ valid: false, message: 'Mã đã hết hạn' });
+  }
+  if (km.dieuKienDonToiThieu && tongTien < Number(km.dieuKienDonToiThieu)) {
+    return res.status(400).json({ valid: false, message: `Đơn tối thiểu ${km.dieuKienDonToiThieu.toLocaleString()}đ` });
+  }
+  const discount = km.loaiKhuyenMai === 'PHAN_TRAM'
+    ? (tongTien * Number(km.giaTriGiam)) / 100
+    : Number(km.giaTriGiam);
+  res.json({ valid: true, discount, km });
+});
+
+const promoController = { getPromos, createPromo, updatePromo, validatePromo };
+
+// ═══════════════════════════════════════════════════
+// PAYMENT CONTROLLER
+// ═══════════════════════════════════════════════════
+const createPayment = asyncHandler(async (req, res) => {
+  const { maDonHang, phuongThuc, tienKhachDua } = req.body;
+  const order = await prisma.donHang.findUnique({ where: { maDonHang } });
+  if (!order) return res.status(404).json({ message: 'Đơn không tồn tại' });
+
+  const payment = await prisma.$transaction(async (tx) => {
+    const thanh = await tx.thanhToan.create({
+      data: {
+        maDonHang, soTienGiaoDich: order.tongThanhToan,
+        thoiGianThanhToan: new Date(), trangThaiGiaoDich: 'THANH_CONG', phuongThuc
+      }
+    });
+
+    if (phuongThuc === 'TIEN_MAT' && tienKhachDua) {
+      await tx.thanhToanTienMat.create({ data: { maThanhToan: thanh.maThanhToan, tienKhachDua } });
+    } else if (phuongThuc === 'QR') {
+      await tx.thanhToanQR.create({ data: { maThanhToan: thanh.maThanhToan, qrContent: `QR_${maDonHang}` } });
+    }
+
+    await tx.donHang.update({ where: { maDonHang }, data: { trangThai: 'HOAN_THANH' } });
+    return thanh;
+  });
+
+  res.status(201).json({
+    ...payment,
+    tienThoi: phuongThuc === 'TIEN_MAT' && tienKhachDua
+      ? tienKhachDua - Number(order.tongThanhToan)
+      : 0
+  });
+});
+
+const paymentController = { createPayment };
+
+// ═══════════════════════════════════════════════════
+// WEBHOOK CONTROLLER (GrabFood / ShopeeFood)
+// ═══════════════════════════════════════════════════
+const { v4: uuid2 } = require('uuid');
+
+const handleDeliveryWebhook = asyncHandler(async (req, res) => {
+  const { platform } = req.params; // grab | shopee
+  const payload = req.body;
+
+  const maDonHang = `DH_${uuid2().substring(0, 8).toUpperCase()}`;
+  const order = await prisma.donHang.create({
+    data: {
+      maDonHang, trangThai: 'CHO_XAC_NHAN',
+      loaiDonHang: platform === 'grab' ? 'GRAB' : 'SHOPEE',
+      maDonDoiTac: payload.order_id || payload.orderId,
+      tongTien: payload.total_price || payload.totalAmount,
+      tongThanhToan: payload.total_price || payload.totalAmount,
+      thongTinGuest: JSON.stringify(payload.customer || {}),
+      chiTiet: { create: [] } // parse items from payload in production
+    }
+  });
+
+  const { emitNewOrder } = require('../socket/socketManager');
+  emitNewOrder(order);
+  res.json({ received: true, maDonHang });
+});
+
+const webhookController = { handleDeliveryWebhook };
+
+module.exports = {
+  kdsController,
+  tableController,
+  inventoryController,
+  staffController,
+  reportController,
+  promoController,
+  paymentController,
+  webhookController,
+};

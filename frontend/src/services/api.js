@@ -1,0 +1,117 @@
+import axios from 'axios';
+import { io } from 'socket.io-client';
+
+// ─── Axios instance ────────────────────────────────
+const api = axios.create({
+  baseURL: '/api',
+  headers: { 'Content-Type': 'application/json' }
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+// ─── Socket.IO ────────────────────────────────────
+let socket = null;
+
+export const getSocket = () => {
+  if (!socket) {
+    socket = io('/', { autoConnect: false });
+  }
+  return socket;
+};
+
+export const connectSocket = (rooms = []) => {
+  const s = getSocket();
+  s.connect();
+  rooms.forEach(room => s.emit(`join:${room}`));
+  return s;
+};
+
+// ─── API helpers ──────────────────────────────────
+export const authAPI = {
+  login: (data) => api.post('/auth/login', data),
+  register: (data) => api.post('/auth/register', data),
+  me: () => api.get('/auth/me'),
+  updateProfile: (data) => api.put('/auth/profile', data),
+};
+
+export const menuAPI = {
+  getCategories: () => api.get('/menu/categories'),
+  getItems: (params) => api.get('/menu/items', { params }),
+  getItem: (id) => api.get(`/menu/items/${id}`),
+  createItem: (data) => api.post('/menu/items', data),
+  updateItem: (id, data) => api.put(`/menu/items/${id}`, data),
+  deleteItem: (id) => api.delete(`/menu/items/${id}`),
+  addReview: (id, data) => api.post(`/menu/items/${id}/review`, data),
+  getOptions: () => api.get('/menu/options'),
+};
+
+export const orderAPI = {
+  create: (data) => api.post('/orders', data),
+  list: (params) => api.get('/orders', { params }),
+  get: (id) => api.get(`/orders/${id}`),
+  updateStatus: (id, trangThai) => api.patch(`/orders/${id}/status`, { trangThai }),
+  myOrders: () => api.get('/orders/my'),
+};
+
+export const tableAPI = {
+  list: () => api.get('/tables'),
+  create: (data) => api.post('/tables', data),
+  update: (id, data) => api.put(`/tables/${id}`, data),
+  delete: (id) => api.delete(`/tables/${id}`),
+};
+
+export const kdsAPI = {
+  getOrders: () => api.get('/kds/orders'),
+  accept: (id) => api.patch(`/kds/orders/${id}/accept`),
+  complete: (id) => api.patch(`/kds/orders/${id}/complete`),
+};
+
+export const inventoryAPI = {
+  getIngredients: () => api.get('/inventory/ingredients'),
+  createIngredient: (data) => api.post('/inventory/ingredients', data),
+  updateIngredient: (id, data) => api.put(`/inventory/ingredients/${id}`, data),
+  getVouchers: () => api.get('/inventory/vouchers'),
+  createVoucher: (data) => api.post('/inventory/vouchers', data),
+};
+
+export const staffAPI = {
+  list: () => api.get('/staff'),
+  create: (data) => api.post('/staff', data),
+  getShifts: (params) => api.get('/staff/shifts', { params }),
+  checkin: (data) => api.post('/staff/shifts/checkin', data),
+  checkout: (id) => api.patch(`/staff/shifts/${id}/checkout`),
+};
+
+export const reportAPI = {
+  getRevenue: (params) => api.get('/reports/revenue', { params }),
+  getDaily: (params) => api.get('/reports/daily', { params }),
+};
+
+export const promoAPI = {
+  list: () => api.get('/promotions'),
+  create: (data) => api.post('/promotions', data),
+  update: (id, data) => api.put(`/promotions/${id}`, data),
+  validate: (data) => api.post('/promotions/validate', data),
+};
+
+export const paymentAPI = {
+  create: (data) => api.post('/payments', data),
+};
+
+export default api;

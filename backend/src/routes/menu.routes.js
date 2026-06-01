@@ -1,0 +1,13 @@
+const express = require('express');
+const r = express.Router();
+const ctrl = require('../controllers/menu.controller');
+const { authenticate, requireRole, optionalAuth } = require('../middlewares/auth.middleware');
+r.get('/categories', ctrl.getCategories);
+r.get('/items', ctrl.getItems);
+r.get('/options', ctrl.getOptions);
+r.get('/items/:id', ctrl.getItemById);
+r.post('/items', authenticate, requireRole('Quản lý'), ctrl.createItem);
+r.put('/items/:id', authenticate, requireRole('Quản lý'), ctrl.updateItem);
+r.delete('/items/:id', authenticate, requireRole('Quản lý'), ctrl.deleteItem);
+r.post('/items/:id/review', authenticate, ctrl.addReview);
+module.exports = r;
