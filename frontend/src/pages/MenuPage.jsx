@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { menuAPI } from "../services/api";
+import { menuAPI, cartAPI } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 
 const formatVND = (n) => Number(n).toLocaleString("vi-VN") + "đ";
@@ -25,7 +25,38 @@ export default function MenuPage() {
     menuAPI.getItems(params).then((r) => setItems(r.data.items));
   }, [activeCat, search]);
 
-  const addToCart = (item, qty = 1) => {
+  // load server cart (guest or user) into local state
+  useEffect(() => {
+    const loadCart = async () => {
+      try {
+        const sessionId = localStorage.getItem("sessionId");
+        if (!sessionId) return;
+        const res = await cartAPI.get({ sessionId });
+        const data =
+          res.data?.chiTietGio?.map((c) => ({
+            maMon: c.maMon,
+            qty: c.soLuong,
+            giaBan: c.mon?.giaBan,
+          })) || [];
+        setCart(data);
+      } catch (err) {
+        // ignore
+      }
+    };
+    loadCart();
+  }, []);
+
+  const getSessionId = () => {
+    let s = localStorage.getItem("sessionId");
+    if (!s) {
+      s = `sess_${Math.random().toString(36).slice(2, 9)}`;
+      localStorage.setItem("sessionId", s);
+    }
+    return s;
+  };
+
+  const addToCart = async (item, qty = 1) => {
+    // optimistic local update
     setCart((prev) => {
       const ex = prev.find((c) => c.maMon === item.maMon);
       if (ex)
@@ -35,6 +66,13 @@ export default function MenuPage() {
       return [...prev, { ...item, qty }];
     });
     setDetail(null);
+
+    try {
+      const sessionId = getSessionId();
+      await cartAPI.addItem({ maMon: item.maMon, soLuong: qty, sessionId });
+    } catch (err) {
+      console.error("cartAPI.addItem failed", err);
+    }
   };
 
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
@@ -186,7 +224,7 @@ export default function MenuPage() {
         <div className="fixed bottom-0 left-0 right-0 p-4 z-40">
           <button
             className="w-full max-w-lg mx-auto flex items-center justify-between bg-coffee-800 hover:bg-coffee-900 text-cream-100 rounded-2xl px-5 py-4 shadow-2xl transition-all"
-            onClick={() => navigate(user ? "/account" : "/login")}
+            onClick={() => navigate("/cart")}
           >
             <div className="flex items-center gap-3">
               <span className="bg-coffee-600 text-white text-sm font-bold w-7 h-7 rounded-full flex items-center justify-center">

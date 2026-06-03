@@ -75,4 +75,18 @@ const clearCart = asyncHandler(async (req, res) => {
   res.json({ message: "Giỏ hàng đã được làm mới" });
 });
 
-module.exports = { getCart, upsertCartItem, removeCartItem, clearCart };
+const clearCartByOwner = async ({ maNguoiDung, sessionId }) => {
+  const cart = await findOrCreateCart({ maNguoiDung, sessionId });
+  await prisma.chiTietGioHang.deleteMany({
+    where: { maGioHang: cart.maGioHang },
+  });
+  return cart;
+};
+
+module.exports = {
+  getCart,
+  upsertCartItem,
+  removeCartItem,
+  clearCart,
+  clearCartByOwner,
+};
