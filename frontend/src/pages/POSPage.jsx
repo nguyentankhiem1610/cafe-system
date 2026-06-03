@@ -18,6 +18,7 @@ export default function POSPage() {
   const [orderType, setOrderType] = useState('TAI_QUAN');
   const [payMethod, setPayMethod] = useState('TIEN_MAT');
   const [cashGiven, setCashGiven] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
@@ -76,6 +77,10 @@ export default function POSPage() {
         maKM: promoData?.km?.maKM,
         loaiDonHang: orderType,
         ghiChu: note,
+        customerPhone: customerPhone.trim() || undefined,
+        thongTinGuest: customerPhone.trim()
+          ? JSON.stringify({ soDienThoai: customerPhone.trim(), source: 'POS' })
+          : undefined,
       });
 
       await paymentAPI.create({
@@ -86,7 +91,7 @@ export default function POSPage() {
 
       setLastOrder({ ...orderRes.data, total, change });
       setCart([]);
-      setPromoCode(''); setPromoData(null); setNote(''); setCashGiven('');
+      setPromoCode(''); setPromoData(null); setNote(''); setCashGiven(''); setCustomerPhone('');
       tableAPI.list().then(r => setTables(r.data));
     } catch (err) {
       alert(err.response?.data?.message || 'Tạo đơn thất bại');
@@ -208,6 +213,16 @@ export default function POSPage() {
 
         {/* Payment method */}
         <div className="px-4 py-2 border-t border-cream-100">
+          <div className="mb-3">
+            <p className="text-xs text-coffee-500 mb-1">SĐT khách hàng</p>
+            <input
+              className="input-field text-sm"
+              type="tel"
+              placeholder="Nhập SĐT để lưu lịch sử mua"
+              value={customerPhone}
+              onChange={e => setCustomerPhone(e.target.value)}
+            />
+          </div>
           <p className="text-xs text-coffee-500 mb-1">Thanh toán</p>
           <div className="flex gap-2">
             {['TIEN_MAT','QR','THE_NGAN_HANG'].map(m => (

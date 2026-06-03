@@ -33,7 +33,13 @@ const optionalAuth = async (req, res, next) => {
   if (!header || !header.startsWith('Bearer ')) return next();
   try {
     const decoded = jwt.verify(header.split(' ')[1], JWT_SECRET);
-    req.user = await prisma.nguoiDung.findUnique({ where: { maNguoiDung: decoded.id } });
+    req.user = await prisma.nguoiDung.findUnique({
+      where: { maNguoiDung: decoded.id },
+      include: {
+        khachHang: true,
+        nhanVien: { include: { vaiTro: true } },
+      },
+    });
   } catch (_) {}
   next();
 };

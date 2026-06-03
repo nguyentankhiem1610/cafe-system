@@ -7,6 +7,54 @@ const {
   emitOrderComplete,
 } = require("../socket/socketManager");
 
+const normalizePhone = (value = "") => String(value).replace(/\D/g, "");
+
+const phoneCandidates = (value = "") => {
+  const normalized = normalizePhone(value);
+  if (!normalized) return [];
+  const candidates = new Set([String(value).trim(), normalized]);
+  if (normalized.startsWith("84")) candidates.add(`0${normalized.slice(2)}`);
+  if (normalized.startsWith("0")) candidates.add(`84${normalized.slice(1)}`);
+  return [...candidates].filter(Boolean);
+};
+
+const resolveCustomerId = async ({ currentUser, customerPhone, maKhachHang }) => {
+  if (maKhachHang) {
+    const customer = await prisma.khachHang.findUnique({
+      where: { maKhachHang },
+      select: { maKhachHang: true },
+    });
+    if (customer) return customer.maKhachHang;
+  }
+
+  if (currentUser?.maNguoiDung) {
+    const customer = await prisma.khachHang.findUnique({
+      where: { maKhachHang: currentUser.maNguoiDung },
+      select: { maKhachHang: true },
+    });
+    if (customer) return customer.maKhachHang;
+  }
+
+  const phones = phoneCandidates(customerPhone);
+  if (phones.length === 0) return undefined;
+
+  const user = await prisma.nguoiDung.findFirst({
+    where: {
+      soDienThoai: { in: phones },
+      khachHang: { isNot: null },
+    },
+    select: { maNguoiDung: true },
+  });
+
+  if (user) return user.maNguoiDung;
+
+  const matchedCustomer = await prisma.khachHang.findFirst({
+    where: { soDienThoai: { in: phones } },
+    select: { maKhachHang: true },
+  });
+  return matchedCustomer?.maKhachHang;
+};
+
 // POST /api/orders — create order (POS or web)
 const createOrder = asyncHandler(async (req, res) => {
   const {
@@ -18,7 +66,15 @@ const createOrder = asyncHandler(async (req, res) => {
     soTheRung,
     thongTinGuest,
     maDiaChi,
+    customerPhone,
+    maKhachHang,
   } = req.body;
+
+  const resolvedCustomerId = await resolveCustomerId({
+    currentUser: req.user,
+    customerPhone,
+    maKhachHang,
+  });
 
   // Build order items + calculate total
   const itemDetails = await Promise.all(
@@ -95,7 +151,7 @@ const createOrder = asyncHandler(async (req, res) => {
         tienGiamGia,
         tongThanhToan: Math.max(0, tongTien - tienGiamGia),
         maNhanVien: req.user?.nhanVien ? req.user.maNguoiDung : undefined,
-        maKhachHang: req.user?.khachHang ? req.user.maNguoiDung : undefined,
+        maKhachHang: resolvedCustomerId,
         chiTiet: {
           create: itemDetails.map((item) => ({
             maChiTiet: `CT_${uuidv4().substring(0, 8).toUpperCase()}`,
@@ -243,7 +299,10 @@ const updateStatus = asyncHandler(async (req, res) => {
 // GET /api/orders/my — customer order history
 const getMyOrders = asyncHandler(async (req, res) => {
   const orders = await prisma.donHang.findMany({
-    where: { maKhachHang: req.user.maNguoiDung },
+    where: {
+      maKhachHang: req.user.maNguoiDung,
+      thanhToan: { trangThaiGiaoDich: "THANH_CONG" },
+    },
     include: { chiTiet: { include: { mon: true } }, thanhToan: true },
     orderBy: { thoiGianTao: "desc" },
   });
