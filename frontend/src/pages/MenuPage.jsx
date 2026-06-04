@@ -30,8 +30,7 @@ export default function MenuPage() {
     const loadCart = async () => {
       try {
         const sessionId = localStorage.getItem("sessionId");
-        if (!sessionId) return;
-        const res = await cartAPI.get({ sessionId });
+        const res = await cartAPI.get(sessionId ? { sessionId } : undefined);
         const data =
           res.data?.chiTietGio?.map((c) => ({
             maMon: c.maMon,
@@ -97,6 +96,17 @@ export default function MenuPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            <button
+              onClick={() => navigate("/cart")}
+              className="relative text-sm bg-coffee-700 hover:bg-coffee-600 px-3 py-1.5 rounded-lg transition-all"
+            >
+              Giỏ hàng
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-amber-400 text-coffee-900 text-[11px] font-bold min-w-5 h-5 px-1 rounded-full flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </button>
             {user ? (
               <div className="flex items-center gap-2">
                 <span className="text-cream-300 text-sm">{user.hoTen}</span>

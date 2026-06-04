@@ -10,6 +10,7 @@ import KDSPage from "./pages/KDSPage";
 import DashboardPage from "./pages/DashboardPage";
 import TablePage from "./pages/TablePage";
 import InventoryPage from "./pages/InventoryPage";
+import AdminMenuPage from "./pages/AdminMenuPage";
 import StaffPage from "./pages/StaffPage";
 import OrdersPage from "./pages/OrdersPage";
 import CustomerPage from "./pages/CustomerPage";
@@ -90,6 +91,15 @@ export default function App() {
           />
 
           <Route
+            path="/admin/menu"
+            element={
+              <ProtectedRoute allowedRoles={["Quản lý"]}>
+                <AdminMenuPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/staff"
             element={
               <ProtectedRoute allowedRoles={["Quản lý"]}>
@@ -109,6 +119,15 @@ export default function App() {
 
           <Route
             path="/account"
+            element={
+              <ProtectedRoute>
+                <CustomerPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/history"
             element={
               <ProtectedRoute>
                 <CustomerPage />
