@@ -49,11 +49,29 @@ export default function CustomerPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("https://provinces.open-api.vn/api/p");
-        const data = await res.json();
-        setProvinces(data || []);
+        const res = await fetch(
+          "https://raw.githubusercontent.com/daohoangson/dvhcvn/master/data/dvhcvn.json",
+        );
+        const json = await res.json();
+        const data = json.data || json.provinces || json;
+        let provs = Array.isArray(data) ? data : [];
+        if (provs.length && provs[0].level2s) {
+          provs = provs.map((p) => ({
+            code: p.level1_id || p.code || p.id,
+            name: p.name || p.title,
+            districts: (p.level2s || []).map((d) => ({
+              code: d.level2_id || d.code || d.id,
+              name: d.name,
+              wards: (d.level3s || []).map((w) => ({
+                code: w.level3_id || w.code || w.id,
+                name: w.name,
+              })),
+            })),
+          }));
+        }
+        setProvinces(provs || []);
       } catch (e) {
-        console.warn("Failed to load provinces", e);
+        console.warn("Failed to load provinces from dvhcvn remote", e);
       }
     })();
   }, []);
@@ -64,18 +82,13 @@ export default function CustomerPage() {
       setSelectedDistrict("");
       return;
     }
-    (async () => {
-      try {
-        const res = await fetch(
-          `https://provinces.open-api.vn/api/p/${selectedProvince}?depth=2`,
-        );
-        const data = await res.json();
-        setDistricts(data.districts || []);
-      } catch (e) {
-        console.warn("Failed to load districts", e);
-      }
-    })();
-  }, [selectedProvince]);
+    const p = provinces.find(
+      (x) =>
+        String(x.code) === String(selectedProvince) ||
+        String(x.id) === String(selectedProvince),
+    );
+    setDistricts(p?.districts || []);
+  }, [selectedProvince, provinces]);
 
   useEffect(() => {
     if (!selectedDistrict) {
@@ -83,18 +96,13 @@ export default function CustomerPage() {
       setSelectedWard("");
       return;
     }
-    (async () => {
-      try {
-        const res = await fetch(
-          `https://provinces.open-api.vn/api/d/${selectedDistrict}?depth=2`,
-        );
-        const data = await res.json();
-        setWards(data.wards || []);
-      } catch (e) {
-        console.warn("Failed to load wards", e);
-      }
-    })();
-  }, [selectedDistrict]);
+    const d = districts.find(
+      (x) =>
+        String(x.code) === String(selectedDistrict) ||
+        String(x.id) === String(selectedDistrict),
+    );
+    setWards(d?.wards || []);
+  }, [selectedDistrict, districts]);
 
   const handleSaveProfile = async () => {
     const findName = (list, code) => {
