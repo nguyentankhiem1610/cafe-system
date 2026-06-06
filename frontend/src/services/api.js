@@ -80,6 +80,7 @@ export const cartAPI = {
 
 export const customerAPI = {
   getPoints: () => api.get("/customer/points"),
+  getLeaderboard: () => api.get("/customer/leaderboard"),
   redeem: (data) => api.post("/customer/redeem", data),
 };
 

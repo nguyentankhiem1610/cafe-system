@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { orderAPI, authAPI } from "../services/api";
+import { orderAPI, authAPI, customerAPI } from "../services/api";
 
 const formatVND = (n) => Number(n).toLocaleString("vi-VN") + "đ";
 
@@ -25,6 +25,10 @@ export default function CustomerPage() {
   });
   const [saved, setSaved] = useState(false);
 
+  // Leaderboard states
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [myRank, setMyRank] = useState(null);
+
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [wards, setWards] = useState([]);
@@ -43,6 +47,10 @@ export default function CustomerPage() {
       });
       setStreetAddress(user.diaChi || "");
       orderAPI.myOrders().then((r) => setOrders(r.data));
+      customerAPI.getLeaderboard().then((r) => {
+        setLeaderboard(r.data.top);
+        setMyRank(r.data.myRank);
+      });
     }
   }, [user]);
 
@@ -177,14 +185,14 @@ export default function CustomerPage() {
 
       <div className="max-w-2xl mx-auto px-4 py-4">
         {/* Tabs */}
-        <div className="flex gap-3 mb-4">
-          {["orders", "profile"].map((t) => (
+        <div className="flex gap-3 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+          {["orders", "profile", "rewards"].map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${tab === t ? "bg-coffee-600 text-white" : "bg-white text-coffee-700 border border-cream-300"}`}
+              className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${tab === t ? "bg-coffee-600 text-white shadow-md" : "bg-white text-coffee-700 border border-cream-300"}`}
             >
-              {t === "orders" ? "📋 Lịch sử đơn" : "👤 Hồ sơ"}
+              {t === "orders" ? "📋 Lịch sử đơn" : t === "profile" ? "👤 Hồ sơ" : "🏆 Tích điểm / Thành viên"}
             </button>
           ))}
         </div>
@@ -350,6 +358,66 @@ export default function CustomerPage() {
             >
               {saved ? "✓ Đã lưu!" : "Lưu thay đổi"}
             </button>
+          </div>
+        )}
+
+        {/* Rewards */}
+        {tab === "rewards" && (
+          <div className="space-y-6">
+            <div className="card p-6 text-center bg-gradient-to-br from-coffee-800 to-coffee-900 text-cream-100 border-none shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10 text-8xl">☕</div>
+              <h2 className="text-xl font-display font-bold mb-1">Hạng Thành Viên</h2>
+              <div className="text-amber-400 text-2xl font-bold uppercase tracking-widest mb-4">
+                {myRank?.hangThanhVien || "Đồng"}
+              </div>
+              <div className="flex justify-center gap-8 mb-2">
+                <div>
+                  <div className="text-sm text-cream-400">Điểm hiện tại</div>
+                  <div className="text-3xl font-display font-bold text-white">{myRank?.diemThuong || 0}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-cream-400">Xếp hạng</div>
+                  <div className="text-3xl font-display font-bold text-white">#{myRank?.rank || "-"}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card p-0 overflow-hidden">
+              <div className="bg-cream-200 px-6 py-4 border-b border-cream-300">
+                <h3 className="font-display font-bold text-coffee-900 flex items-center gap-2">
+                  <span>🏆</span> Bảng Xếp Hạng Top 10
+                </h3>
+              </div>
+              <div className="divide-y divide-cream-200">
+                {leaderboard.length === 0 ? (
+                  <div className="p-8 text-center text-coffee-500">
+                    Chưa có dữ liệu bảng xếp hạng
+                  </div>
+                ) : (
+                  leaderboard.map((m) => (
+                    <div key={m.maKhachHang} className={`flex items-center gap-4 p-4 transition-colors hover:bg-cream-50 ${m.maKhachHang === user.maNguoiDung ? 'bg-amber-50' : ''}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0
+                        ${m.rank === 1 ? 'bg-yellow-400 text-yellow-900 shadow-md' : 
+                          m.rank === 2 ? 'bg-gray-300 text-gray-800 shadow-sm' : 
+                          m.rank === 3 ? 'bg-amber-700 text-amber-100 shadow-sm' : 
+                          'bg-cream-200 text-coffee-600'}`}>
+                        {m.rank}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-coffee-900 truncate">
+                          {m.hoTen}
+                          {m.maKhachHang === user.maNguoiDung && <span className="ml-2 text-xs bg-coffee-100 text-coffee-700 px-2 py-0.5 rounded-full">Bạn</span>}
+                        </div>
+                        <div className="text-xs text-coffee-500 uppercase tracking-wide">Hạng {m.hangThanhVien}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-display font-bold text-lg text-coffee-800">{m.diemThuong} <span className="text-xs font-normal text-coffee-500">đ</span></div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
