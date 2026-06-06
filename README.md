@@ -95,7 +95,9 @@ CREATE DATABASE cafe_db;
 
 ### Cách 1: Dùng Prisma (Khuyến nghị)
 npx prisma generate
+
 npx prisma db push
+
 npm run db:seed
 ### Cách 2: Import database có sẵn
 
