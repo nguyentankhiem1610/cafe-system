@@ -56,6 +56,27 @@ const completeOrder = asyncHandler(async (req, res) => {
       data: { trangThai: "CHO_DON" },
     });
   }
+
+  // Add reward points for members
+  if (order.maKhachHang) {
+    const ktv = await prisma.khachThanhVien.findUnique({
+      where: { maKhachHang: order.maKhachHang },
+    });
+    if (ktv) {
+      const newPoints = ktv.diemThuong + 1;
+      let hang = ktv.hangThanhVien || "Đồng";
+      if (newPoints >= 100) hang = "Kim cương";
+      else if (newPoints >= 50) hang = "Vàng";
+      else if (newPoints >= 10) hang = "Bạc";
+      else hang = "Đồng";
+
+      await prisma.khachThanhVien.update({
+        where: { maKhachHang: order.maKhachHang },
+        data: { diemThuong: newPoints, hangThanhVien: hang },
+      });
+    }
+  }
+
   emitOrderComplete(order);
   res.json(order);
 });
