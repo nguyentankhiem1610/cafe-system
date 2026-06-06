@@ -40,44 +40,103 @@ cafe-system/
 
 ---
 
-## Cài đặt và chạy
+HƯỚNG DẪN CÀI ĐẶT DỰ ÁN
+###1. Yêu cầu môi trường
 
-### 1. Yêu cầu
-- Node.js >= 18
-- MySQL >= 8.0
+###Cài đặt trước:
 
-### 2. Backend
+Node.js 18+
+MySQL 8.0 hoặc XAMPP
+Git
 
-```bash
+###Kiểm tra:
+
+node -v
+npm -v
+git --version
+###2. Clone dự án
+git clone <repository-url>
+cd cafe-management-system
+
+###Hoặc nếu đã được thêm vào GitHub Repository:
+
+git clone https://github.com/<owner>/<repo>.git
+###3. Cài đặt Backend
+
+###Di chuyển vào thư mục backend:
+
 cd backend
-cp .env.example .env
-# Sửa DATABASE_URL trong .env
+
+###Cài đặt thư viện:
 
 npm install
-## Nhóm có tích hợp API thanh toán bằng VNPAY nên
+
+###Nếu dự án sử dụng VNPAY:
+
 npm install vnpay
+###4. Cấu hình môi trường
 
-### tạo database MySQL cafe_db rỗng trên XAMPP hoặc SQL Workbench
-## dùng data mẫu
-npx prisma db push        # Tạo tables từ schema
-npm run db:seed           # Seed dữ liệu mẫu
+Tạo file .env:
 
-## hoặc import database trong thư mục backend/database/cafe_db
+cp .env.example .env
+
+###Mở file .env và cập nhật:
+
+DATABASE_URL="mysql://root:@localhost:3306/cafe_db"
+JWT_SECRET=your_secret_key
+PORT=3001
+###5. Tạo Database
+
+###Tạo database rỗng:
+
+CREATE DATABASE cafe_db;
+
+###Có 2 cách khởi tạo dữ liệu:
+
+###Cách 1: Dùng Prisma (Khuyến nghị)
+npx prisma generate
+npx prisma db push
+npm run db:seed
+###Cách 2: Import database có sẵn
+
+###Import file:
+
+backend/database/cafe_db.sql
+
+###Sau đó chạy:
 
 npx prisma generate
 
-npm run dev               # Chạy backend port 3001
-```
+###Không cần chạy:
 
-### 3. Frontend
+npx prisma db push
 
-```bash
+###nếu database đã được import đầy đủ.
+
+###6. Chạy Backend
+npm run dev
+
+###Backend chạy tại:
+
+http://localhost:3001
+###7. Cài đặt Frontend
+
+###Mở terminal mới:
+
 cd frontend
 npm install
-npm run dev               # Chạy frontend port 5173
-```
 
----
+###Tạo file .env nếu dự án yêu cầu:
+
+VITE_API_URL=http://localhost:3001/api
+
+###Chạy frontend:
+
+npm run dev
+
+Frontend chạy tại:
+
+http://localhost:5173
 
 ## Tài khoản demo
 
