@@ -9,7 +9,31 @@ const getPoints = asyncHandler(async (req, res) => {
     include: { khachThanhVien: true },
   });
   const points = kh?.khachThanhVien?.diemThuong || 0;
-  res.json({ points });
+  const hangThanhVien = kh?.khachThanhVien?.hangThanhVien || "Đồng";
+  res.json({ points, hangThanhVien });
+});
+
+// GET /api/customer/leaderboard
+const getLeaderboard = asyncHandler(async (req, res) => {
+  const userId = req.user?.maNguoiDung;
+  
+  const allMembers = await prisma.khachThanhVien.findMany({
+    include: { khachHang: { include: { nguoiDung: { select: { hoTen: true } } } } },
+    orderBy: { diemThuong: "desc" },
+  });
+
+  const leaderboard = allMembers.map((m, index) => ({
+    rank: index + 1,
+    maKhachHang: m.maKhachHang,
+    hoTen: m.khachHang?.nguoiDung?.hoTen || "Thành viên ẩn danh",
+    diemThuong: m.diemThuong,
+    hangThanhVien: m.hangThanhVien || "Đồng"
+  }));
+
+  const top10 = leaderboard.slice(0, 10);
+  const myRank = leaderboard.find(m => m.maKhachHang === userId) || null;
+
+  res.json({ top: top10, myRank });
 });
 
 // POST /api/customer/redeem — redeem points (simple decrement)
@@ -31,7 +55,7 @@ const redeemPoints = asyncHandler(async (req, res) => {
     where: { maKhachHang: userId },
     data: { diemThuong: { decrement: points } },
   });
-  res.json({ message: "Đổi điểm thành công", points: updated.diemThuong });
+  res.json({ message: "Đổi điểm thành công", points: updated.diemThuong, hangThanhVien: updated.hangThanhVien });
 });
 
-module.exports = { getPoints, redeemPoints };
+module.exports = { getPoints, getLeaderboard, redeemPoints };
