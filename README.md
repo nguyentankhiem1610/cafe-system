@@ -50,55 +50,62 @@ MySQL 8.0 hoặc XAMPP
 Git
 
 ## Kiểm tra:
-
+```
 node -v
 npm -v
 git --version
+```
 ### 2. Clone dự án
+```
 git clone [<repository-url>](https://github.com/nguyentankhiem1610/cafe-system.git)
 cd cafe-management-system
-
+```
 ## Hoặc nếu đã được thêm vào GitHub Repository:
-
+```
 git clone [https://github.com/<owner>/<repo>.git](https://github.com/nguyentankhiem1610/cafe-system.git)
+```
 ### 3. Cài đặt Backend
 
 ## Di chuyển vào thư mục backend:
-
+```
 cd backend
-
+```
 ## Cài đặt thư viện:
-
+```
 npm install
-
+```
 ## Nếu dự án sử dụng VNPAY:
-
+```
 npm install vnpay
+```
 ### 4. Cấu hình môi trường
 
 Tạo file .env:
-
+```
 cp .env.example .env
-
+```
 ## Mở file .env và cập nhật:
-
+```
 DATABASE_URL="mysql://root:@localhost:3306/cafe_db"
 JWT_SECRET=your_secret_key
 PORT=3001
+```
 ### 5. Tạo Database
 
 ## Tạo database rỗng:
-
+```
 CREATE DATABASE cafe_db;
-
+```
 ## Có 2 cách khởi tạo dữ liệu:
 
 ### Cách 1: Dùng Prisma (Khuyến nghị)
+```
 npx prisma generate
 
 npx prisma db push
 
 npm run db:seed
+```
 ### Cách 2: Import database có sẵn
 
 ## Import file:
@@ -106,36 +113,37 @@ npm run db:seed
 backend/database/cafe_db.sql
 
 ## Sau đó chạy:
-
+```
 npx prisma generate
-
+```
 ## Không cần chạy:
-
+```
 npx prisma db push
-
+```
 ## nếu database đã được import đầy đủ.
 
 ### 6. Chạy Backend
+```
 npm run dev
-
+```
 ## Backend chạy tại:
 
 http://localhost:3001
 ### 7. Cài đặt Frontend
 
 ## Mở terminal mới:
-
+```
 cd frontend
 npm install
-
+```
 ## Tạo file .env nếu dự án yêu cầu:
 
 VITE_API_URL=http://localhost:3001/api
 
 ## Chạy frontend:
-
+```
 npm run dev
-
+```
 Frontend chạy tại:
 
 http://localhost:5173
