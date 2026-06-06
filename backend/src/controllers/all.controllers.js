@@ -547,7 +547,16 @@ const createPayment = asyncHandler(async (req, res) => {
   });
 });
 
-const paymentController = { createPayment };
+const getVietQRConfig = asyncHandler(async (req, res) => {
+  res.json({
+    bankId: process.env.VIETQR_BANK_ID || "970415",
+    accountNo: process.env.VIETQR_ACCOUNT_NO || "113366668888",
+    accountName: process.env.VIETQR_ACCOUNT_NAME || "QUY VAC XIN",
+    template: process.env.VIETQR_TEMPLATE || "compact2",
+  });
+});
+
+const paymentController = { createPayment, getVietQRConfig };
 
 const handleVnpayCallback = asyncHandler(async (req, res) => {
   // VNPAY will redirect with query params

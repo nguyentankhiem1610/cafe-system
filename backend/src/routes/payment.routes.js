@@ -7,4 +7,8 @@ r.post("/", optionalAuth, ctrl.createPayment);
 
 // VNPAY callback (redirect URL) - VNPAY will call this without auth
 r.get("/vnpay/callback", ctrl.handleVnpayCallback);
+
+// VietQR config
+r.get("/vietqr-config", ctrl.getVietQRConfig);
+
 module.exports = r;

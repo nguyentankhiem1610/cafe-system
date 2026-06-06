@@ -89,7 +89,23 @@ cp .env.example .env
 DATABASE_URL="mysql://root:@localhost:3306/cafe_db"
 JWT_SECRET=your_secret_key
 PORT=3001
+
+VIETQR_BANK_ID=
+VIETQR_ACCOUNT_NO=
+VIETQR_ACCOUNT_NAME=
+VIETQR_TEMPLATE=
 ```
+- Dự án có sử dụng VietQR API nên hãy cập nhật các thông số riêng vào `.env`, đọc thêm [ở đây](https://vietqr.io/danh-sach-api/link-tao-ma-nhanh/api-tao-ma-qr#operation/generate)
+- Một ví dụ mẫu về `.env` với VietQR API:
+```
+VIETQR_BANK_ID=ICB
+VIETQR_ACCOUNT_NO=104882641761
+VIETQR_ACCOUNT_NAME="TRUONG THANH DAT"
+VIETQR_TEMPLATE=compact2 (có thể chỉnh template theo link trên)
+
+```
+
+- Danh sách ngân hàng hỗ trợ `VIETQR_BANK_ID` theo [link](https://api.vietqr.vn/vi/danh-sach-ma-ngan-hang)
 ### 5. Tạo Database
 
 ## Tạo database rỗng:
