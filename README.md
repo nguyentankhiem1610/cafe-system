@@ -55,12 +55,12 @@ node -v
 npm -v
 git --version
 ### 2. Clone dự án
-git clone <repository-url>
+git clone [<repository-url>](https://github.com/nguyentankhiem1610/cafe-system.git)
 cd cafe-management-system
 
 ## Hoặc nếu đã được thêm vào GitHub Repository:
 
-git clone https://github.com/<owner>/<repo>.git
+git clone [https://github.com/<owner>/<repo>.git](https://github.com/nguyentankhiem1610/cafe-system.git)
 ### 3. Cài đặt Backend
 
 ## Di chuyển vào thư mục backend:
