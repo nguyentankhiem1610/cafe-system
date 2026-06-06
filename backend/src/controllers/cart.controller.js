@@ -37,6 +37,10 @@ const upsertCartItem = asyncHandler(async (req, res) => {
   const maNguoiDung = req.user?.maNguoiDung;
   if (!maMon) return res.status(400).json({ message: "maMon là bắt buộc" });
 
+  const mon = await prisma.mon.findUnique({ where: { maMon } });
+  if (!mon || mon.daXoa)
+    return res.status(400).json({ message: "Món đã ngừng bán" });
+
   const cart = await findOrCreateCart({ maNguoiDung, sessionId });
 
   // Check if item exists in cart
