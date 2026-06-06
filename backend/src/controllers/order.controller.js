@@ -19,7 +19,11 @@ const phoneCandidates = (value = "") => {
   return [...candidates].filter(Boolean);
 };
 
-const resolveCustomerId = async ({ currentUser, customerPhone, maKhachHang }) => {
+const resolveCustomerId = async ({
+  currentUser,
+  customerPhone,
+  maKhachHang,
+}) => {
   if (maKhachHang) {
     const customer = await prisma.khachHang.findUnique({
       where: { maKhachHang },
@@ -54,6 +58,13 @@ const resolveCustomerId = async ({ currentUser, customerPhone, maKhachHang }) =>
     select: { maKhachHang: true },
   });
   return matchedCustomer?.maKhachHang;
+};
+
+const customerRelationInclude = {
+  include: {
+    khachThanhVien: true,
+    khachVangLai: true,
+  },
 };
 
 // POST /api/orders — create order (POS or web)
@@ -175,6 +186,7 @@ const createOrder = asyncHandler(async (req, res) => {
       include: {
         chiTiet: { include: { mon: true, tuyChon: true } },
         ban: true,
+        khachHang: customerRelationInclude,
       },
     });
 
@@ -222,6 +234,7 @@ const getOrders = asyncHandler(async (req, res) => {
           },
         },
         ban: true,
+        khachHang: customerRelationInclude,
         nhanVien: { include: { nguoiDung: { select: { hoTen: true } } } },
         thanhToan: true,
       },
@@ -244,6 +257,7 @@ const getOrderById = asyncHandler(async (req, res) => {
         },
       },
       ban: true,
+      khachHang: customerRelationInclude,
       khuyenMai: true,
       thanhToan: true,
       nhanVien: { include: { nguoiDung: { select: { hoTen: true } } } },
