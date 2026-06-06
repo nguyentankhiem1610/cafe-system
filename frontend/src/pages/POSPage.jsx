@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/common/Sidebar";
 import {
   menuAPI,
@@ -29,6 +30,17 @@ export default function POSPage() {
   const [loading, setLoading] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
 
+  const navigate = useNavigate();
+  const [qrOrder, setQrOrder] = useState(null);
+  const [qrRefreshDisabled, setQrRefreshDisabled] = useState(false);
+  const [qrKey, setQrKey] = useState(Date.now());
+  const [qrConfig, setQrConfig] = useState({
+    bankId: "970415",
+    accountNo: "113366668888",
+    accountName: "QUY VAC XIN",
+    template: "compact2",
+  });
+
   // For options modal
   const [editingCartIndex, setEditingCartIndex] = useState(null);
   const [addingItem, setAddingItem] = useState(null);
@@ -54,6 +66,9 @@ export default function POSPage() {
       if (r.data[0]) setActiveCat(r.data[0].maDanhMuc);
     });
     tableAPI.list().then((r) => setTables(r.data));
+    paymentAPI.getVietQRConfig().then((r) => {
+      if (r.data) setQrConfig(r.data);
+    }).catch(console.warn);
   }, []);
 
   useEffect(() => {
@@ -198,6 +213,19 @@ export default function POSPage() {
           ? JSON.stringify({ soDienThoai: customerPhone.trim(), source: "POS" })
           : undefined,
       });
+
+      if (payMethod === "QR") {
+        setQrOrder({ ...orderRes.data, total, change });
+        setCart([]);
+        setPromoCode("");
+        setPromoData(null);
+        setNote("");
+        setCashGiven("");
+        setCustomerPhone("");
+        tableAPI.list().then((r) => setTables(r.data));
+        setLoading(false);
+        return;
+      }
 
       await paymentAPI.create({
         maDonHang: orderRes.data.maDonHang,
@@ -627,6 +655,71 @@ export default function POSPage() {
             <button onClick={saveOptions} className="btn-primary w-full py-2">
               Lưu tuỳ chỉnh
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* QR Payment Modal */}
+      {qrOrder && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]">
+          <div className="card p-8 w-[400px] text-center shadow-2xl relative overflow-hidden bg-white">
+            <h2 className="font-display text-2xl text-coffee-900 mb-2">
+              Thanh toán VietQR
+            </h2>
+            <p className="text-sm text-coffee-600 mb-6">
+              Mã đơn: #{qrOrder.maDonHang.slice(-8)}
+            </p>
+
+            <div className="bg-white p-4 rounded-xl shadow-inner border border-cream-200 inline-block mb-6 relative">
+              <img
+                src={`https://img.vietqr.io/image/${qrConfig.bankId}-${qrConfig.accountNo}-${qrConfig.template}.png?amount=${qrOrder.total}&addInfo=DH${qrOrder.maDonHang}&accountName=${encodeURIComponent(qrConfig.accountName)}&v=${qrKey}`}
+                alt="VietQR Payment"
+                className="w-64 h-64 object-contain"
+              />
+            </div>
+
+            <div className="text-3xl font-display font-bold text-coffee-900 mb-8">
+              {formatVND(qrOrder.total)}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={async () => {
+                  try {
+                    await paymentAPI.create({
+                      maDonHang: qrOrder.maDonHang,
+                      phuongThuc: "QR",
+                    });
+                    setQrOrder(null);
+                    navigate(`/order/${qrOrder.maDonHang}`);
+                  } catch (err) {
+                    alert("Lỗi khi xác nhận thanh toán");
+                  }
+                }}
+                className="btn-primary py-3 text-lg"
+              >
+                ✓ Thanh toán thành công
+              </button>
+              
+              <button
+                disabled={qrRefreshDisabled}
+                onClick={() => {
+                  setQrKey(Date.now());
+                  setQrRefreshDisabled(true);
+                  setTimeout(() => setQrRefreshDisabled(false), 10000);
+                }}
+                className="btn-secondary py-3 disabled:opacity-50"
+              >
+                {qrRefreshDisabled ? "Đang chờ..." : "↻ Làm mới mã QR"}
+              </button>
+
+              <button
+                onClick={() => setQrOrder(null)}
+                className="text-sm text-coffee-500 hover:text-coffee-900 underline mt-2"
+              >
+                Đóng / Hủy
+              </button>
+            </div>
           </div>
         </div>
       )}

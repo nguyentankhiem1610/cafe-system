@@ -142,6 +142,7 @@ export const promoAPI = {
 
 export const paymentAPI = {
   create: (data) => api.post("/payments", data),
+  getVietQRConfig: () => api.get("/payments/vietqr-config"),
 };
 
 export const incidentAPI = {
