@@ -54,8 +54,16 @@ cp .env.example .env
 # Sửa DATABASE_URL trong .env
 
 npm install
+## Nhóm có tích hợp API thanh toán bằng VNPAY nên
+npm install vnpay
+
+### tạo database MySQL cafe_db rỗng trên XAMPP hoặc SQL Workbench
+## dùng data mẫu
 npx prisma db push        # Tạo tables từ schema
 npm run db:seed           # Seed dữ liệu mẫu
+
+## hoặc import database trong thư mục backend/database/cafe_db
+
 npm run dev               # Chạy backend port 3001
 ```
 
@@ -73,6 +81,7 @@ npm run dev               # Chạy frontend port 5173
 
 | Email | Mật khẩu | Giao diện |
 |-------|----------|-----------|
+|customer@cafe.vn | 123456 | Khách hàng thành viên, mua hàng ONL |
 | manager@cafe.vn | 123456 | Dashboard, tất cả |
 | cashier@cafe.vn | 123456 | POS, Đơn hàng, Bàn |
 | barista@cafe.vn | 123456 | KDS pha chế |
