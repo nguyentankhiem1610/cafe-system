@@ -41,11 +41,12 @@ export default function POSPage() {
   }, []);
 
   useEffect(() => {
-    menuAPI.getItems({ category: activeCat, search, limit: 50 })
+    menuAPI.getItems({ category: activeCat, search, limit: 50, includeHidden: true })
       .then(r => setItems(r.data.items));
   }, [activeCat, search]);
 
   const handleGridClick = (item) => {
+    if (item.daXoa) return;
     const isDoUong = item.doUong != null || item.danhMuc?.tenDanhMuc?.toLowerCase().includes('nước') || item.danhMuc?.tenDanhMuc?.toLowerCase().includes('trà') || item.danhMuc?.tenDanhMuc?.toLowerCase().includes('cà phê');
     if (isDoUong) {
       setAddingItem(item);
@@ -190,12 +191,23 @@ export default function POSPage() {
 
         {/* Items grid */}
         <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 xl:grid-cols-3 gap-3 content-start">
-          {items.map(item => (
-            <button key={item.maMon} onClick={() => handleGridClick(item)}
-              className="card p-3 text-left hover:shadow-md hover:border-coffee-300 transition-all active:scale-95 group">
+          {items.map(item => {
+            const isHidden = !!item.daXoa;
+            return (
+            <button key={item.maMon} onClick={() => handleGridClick(item)} disabled={isHidden}
+              className={`card p-3 text-left transition-all group relative ${
+                isHidden
+                  ? 'opacity-45 grayscale cursor-not-allowed border-dashed border-cream-400'
+                  : 'hover:shadow-md hover:border-coffee-300 active:scale-95'
+              }`}>
+              {isHidden && (
+                <span className="absolute top-2 right-2 z-10 text-[10px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
+                  Đã ẩn
+                </span>
+              )}
               <div className="aspect-square bg-cream-100 rounded-lg mb-2 overflow-hidden">
                 {item.hinhAnh?.[0] ? (
-                  <img src={item.hinhAnh[0].urlAnh} alt={item.tenMon} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  <img src={item.hinhAnh[0].urlAnh} alt={item.tenMon} className={`w-full h-full object-cover transition-transform ${isHidden ? '' : 'group-hover:scale-105'}`} />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-3xl">☕</div>
                 )}
@@ -204,7 +216,8 @@ export default function POSPage() {
               <p className="text-coffee-600 font-bold text-sm mt-1">{formatVND(item.giaBan)}</p>
               {item.danhMuc && <span className="text-xs text-coffee-400">{item.danhMuc.tenDanhMuc}</span>}
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
 
