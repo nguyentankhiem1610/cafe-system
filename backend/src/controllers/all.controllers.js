@@ -45,17 +45,29 @@ const acceptOrder = asyncHandler(async (req, res) => {
 
 // PATCH /api/kds/orders/:id/complete
 const completeOrder = asyncHandler(async (req, res) => {
-  const order = await prisma.donHang.update({
-    where: { maDonHang: req.params.id },
-    data: { trangThai: "HOAN_THANH" },
-    include: { chiTiet: { include: { mon: true } }, ban: true },
-  });
-  if (order.maBan) {
-    await prisma.ban.update({
-      where: { maBan: order.maBan },
-      data: { trangThai: "CHO_DON" },
+  const order = await prisma.$transaction(async (tx) => {
+    const maDonHang = req.params.id;
+
+    await deductInventoryForOrder(tx, {
+      maDonHang,
+      maNhanVien: req.user?.maNguoiDung,
     });
-  }
+
+    const updated = await tx.donHang.update({
+      where: { maDonHang },
+      data: { trangThai: "HOAN_THANH" },
+      include: { chiTiet: { include: { mon: true } }, ban: true },
+    });
+
+    if (updated.maBan) {
+      await tx.ban.update({
+        where: { maBan: updated.maBan },
+        data: { trangThai: "CHO_DON" },
+      });
+    }
+
+    return updated;
+  });
 
   // Add reward points for members
   if (order.maKhachHang) {
@@ -507,14 +519,6 @@ const createPayment = asyncHandler(async (req, res) => {
       });
     }
 
-    // Mark order as paid by updating its payment but DO NOT change order status to HOAN_THANH
-    if (trangThaiGiaoDich === "THANH_CONG") {
-      await deductInventoryForOrder(tx, {
-        maDonHang,
-        maNhanVien: req.user?.maNguoiDung,
-      });
-    }
-
     return thanh;
   });
 
@@ -573,12 +577,9 @@ const handleVnpayCallback = asyncHandler(async (req, res) => {
   if (!thanh) return res.status(404).send("Payment not found");
 
   if (responseCode === "00") {
-    await prisma.$transaction(async (tx) => {
-      await tx.thanhToan.update({
-        where: { maThanhToan: thanh.maThanhToan },
-        data: { trangThaiGiaoDich: "THANH_CONG" },
-      });
-      await deductInventoryForOrder(tx, { maDonHang });
+    await prisma.thanhToan.update({
+      where: { maThanhToan: thanh.maThanhToan },
+      data: { trangThaiGiaoDich: "THANH_CONG" },
     });
     const order = await prisma.donHang.findUnique({ where: { maDonHang } });
     const guestContext = parseGuestCartContext(order);

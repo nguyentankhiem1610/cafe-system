@@ -151,10 +151,16 @@ export default function KDSPage() {
   };
 
   const handleComplete = async (id) => {
-    await kdsAPI.complete(id);
-    setOrders(prev => prev.filter(o => o.maDonHang !== id));
-    setAlert({ msg: 'Đã hoàn thành đơn — gọi thẻ rung!', type: 'done' });
-    setTimeout(() => setAlert(null), 4000);
+    try {
+      await kdsAPI.complete(id);
+      setOrders(prev => prev.filter(o => o.maDonHang !== id));
+      setAlert({ msg: 'Đã hoàn thành đơn — gọi thẻ rung!', type: 'done' });
+      setTimeout(() => setAlert(null), 4000);
+    } catch (e) {
+      const msg = e.response?.data?.message || 'Không thể hoàn thành đơn';
+      setAlert({ msg, type: 'error' });
+      setTimeout(() => setAlert(null), 6000);
+    }
   };
 
   const cols = {
@@ -193,9 +199,11 @@ export default function KDSPage() {
         {/* Alert toast */}
         {alert && (
           <div className={`mx-6 mt-3 px-4 py-3 rounded-lg text-sm font-medium ${
-            alert.type === 'new' ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-green-100 text-green-800 border border-green-300'
+            alert.type === 'new' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+            alert.type === 'error' ? 'bg-red-100 text-red-800 border border-red-300' :
+            'bg-green-100 text-green-800 border border-green-300'
           }`}>
-            {alert.type === 'new' ? '🆕 ' : '✅ '}{alert.msg}
+            {alert.type === 'new' ? '🆕 ' : alert.type === 'error' ? '⚠️ ' : '✅ '}{alert.msg}
           </div>
         )}
 
