@@ -6,7 +6,10 @@ const {
   emitOrderStatusUpdate,
   emitOrderComplete,
 } = require("../socket/socketManager");
-const { restoreInventoryForOrder } = require("../services/inventory.service");
+const {
+  deductInventoryForOrder,
+  restoreInventoryForOrder,
+} = require("../services/inventory.service");
 
 const normalizePhone = (value = "") => String(value).replace(/\D/g, "");
 
@@ -282,9 +285,16 @@ const updateStatus = asyncHandler(async (req, res) => {
   }
 
   const order = await prisma.$transaction(async (tx) => {
+    const maDonHang = req.params.id;
     if (trangThai === "HUY") {
       await restoreInventoryForOrder(tx, {
-        maDonHang: req.params.id,
+        maDonHang,
+        maNhanVien: req.user?.maNguoiDung,
+      });
+    }
+    if (trangThai === "HOAN_THANH") {
+      await deductInventoryForOrder(tx, {
+        maDonHang,
         maNhanVien: req.user?.maNguoiDung,
       });
     }

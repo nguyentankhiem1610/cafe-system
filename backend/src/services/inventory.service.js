@@ -29,7 +29,7 @@ const aggregateConsumption = (orderItems) => {
 };
 
 /**
- * Trừ kho tự động theo định mức khi đơn hàng thanh toán thành công.
+ * Trừ kho tự động theo định mức khi pha chế hoàn thành đơn.
  */
 const deductInventoryForOrder = async (tx, { maDonHang, maNhanVien }) => {
   const order = await tx.donHang.findUnique({
@@ -63,6 +63,24 @@ const deductInventoryForOrder = async (tx, { maDonHang, maNhanVien }) => {
   });
   if (existing) return existing;
 
+  for (const item of items) {
+    const nl = await tx.nguyenLieu.findUnique({
+      where: { maNguyenLieu: item.maNguyenLieu },
+    });
+    if (!nl || nl.daXoa) {
+      throw {
+        statusCode: 400,
+        message: `Nguyên liệu ${item.tenNL || item.maNguyenLieu} không hợp lệ`,
+      };
+    }
+    if (nl.tonKho < item.soLuong) {
+      throw {
+        statusCode: 400,
+        message: `Tồn kho ${nl.tenNL} không đủ (cần ${item.soLuong}${nl.donVi}, còn ${nl.tonKho}${nl.donVi})`,
+      };
+    }
+  }
+
   const tongGiaTri = items.reduce(
     (s, i) => s + i.soLuong * i.donGia,
     0,
@@ -75,7 +93,7 @@ const deductInventoryForOrder = async (tx, { maDonHang, maNhanVien }) => {
       loaiPhieu: "BAN_HANG",
       maNhanVien: maNhanVien || order.maNhanVien || "NV_MANAGER01",
       maDonHang,
-      ghiChu: `Tự động trừ kho theo đơn hàng ${maDonHang}`,
+      ghiChu: `Tự động trừ kho khi hoàn thành pha chế ${maDonHang}`,
       chiTiet: {
         create: items.map((i) => ({
           maNguyenLieu: i.maNguyenLieu,
